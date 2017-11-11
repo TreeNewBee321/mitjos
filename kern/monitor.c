@@ -25,7 +25,6 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 };
-#define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
 /***** Implementations of basic kernel monitor commands *****/
 
@@ -34,7 +33,7 @@ mon_help(int argc, char **argv, struct Trapframe *tf)
 {
 	int i;
 
-	for (i = 0; i < NCOMMANDS; i++)
+	for (i = 0; i < ARRAY_SIZE(commands); i++)
 		cprintf("%s - %s\n", commands[i].name, commands[i].desc);
 	return 0;
 }
@@ -58,7 +57,18 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-	// Your code here.
+	struct Eipdebuginfo info;
+	uint32_t *ebp = (uint32_t *) read_ebp();
+	cprintf("Stack backtrace:\n");
+	while (ebp) {
+	    cprintf(" ebp %08x eip %08x args", ebp, ebp[1]);
+	    for (int j = 2; j != 7; ++j) {
+		cprintf(" %08x", ebp[j]);   
+	    }
+	    debuginfo_eip(ebp[1], &info);
+	    cprintf("\n     %s:%d: %.*s+%d\n", info.eip_file, info.eip_line, info.eip_fn_namelen, info.eip_fn_name, ebp[1] - info.eip_fn_addr);
+	    ebp = (uint32_t *) (*ebp);
+	}
 	return 0;
 }
 
@@ -100,7 +110,7 @@ runcmd(char *buf, struct Trapframe *tf)
 	// Lookup and invoke the command
 	if (argc == 0)
 		return 0;
-	for (i = 0; i < NCOMMANDS; i++) {
+	for (i = 0; i < ARRAY_SIZE(commands); i++) {
 		if (strcmp(argv[0], commands[i].name) == 0)
 			return commands[i].func(argc, argv, tf);
 	}
